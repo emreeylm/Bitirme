@@ -1,0 +1,34 @@
+# Tek Kavşak - Orta Trafik
+
+sumo_cfg: "data/scenarios/single_intersection_new/map_medium.sumocfg"
+net_file: "data/scenarios/single_intersection_new/single_tls.net.xml"
+route_file: "data/scenarios/single_intersection_new/traffic_medium.rou.xml"
+
+use_gui: false
+num_seconds: 900
+yellow_time: 3
+min_green_time: 10
+max_green_time: 60
+delta_time: 5
+
+algorithm: "dqn"
+num_episodes: 1000
+max_steps: 900
+device: "cpu"
+
+lr: 0.001
+gamma: 0.99
+epsilon_start: 1.0
+epsilon_end: 0.01
+epsilon_decay: 0.995
+batch_size: 64
+buffer_size: 10000
+target_update_freq: 100
+
+checkpoint_dir: "experiments/checkpoints/single_medium"
+log_dir: "experiments/logs/single_medium"
+save_freq: 100
+eval_freq: 50
+
+eval_episodes: 5
+eval_use_gui: false

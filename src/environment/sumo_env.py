@@ -326,24 +326,42 @@ class SumoEnvironment(Env):
         - Negative waiting time (minimize)
         - Negative queue length (minimize)
         - Negative number of stops (minimize)
+        - Positive throughput (maximize)
         """
         total_waiting_time = 0.0
         total_queue_length = 0.0
         total_stops = 0
+        total_vehicles = 0
         
         for tl_id in self.traffic_lights:
             controlled_lanes = traci.trafficlight.getControlledLanes(tl_id)
             
             for lane in controlled_lanes:
-                total_waiting_time += traci.lane.getWaitingTime(lane)
-                total_queue_length += traci.lane.getLastStepHaltingNumber(lane)
-                total_stops += traci.lane.getLastStepHaltingNumber(lane)
+                waiting_time = traci.lane.getWaitingTime(lane)
+                queue_length = traci.lane.getLastStepHaltingNumber(lane)
+                vehicle_count = traci.lane.getLastStepVehicleNumber(lane)
+                
+                total_waiting_time += waiting_time
+                total_queue_length += queue_length
+                total_stops += queue_length  # Halting vehicles count as stops
+                total_vehicles += vehicle_count
         
-        # Reward = negative of penalties (we want to minimize these)
-        reward = -(
-            0.1 * total_waiting_time +
-            0.1 * total_queue_length +
-            0.05 * total_stops
+        # Normalize by number of traffic lights to make reward scale consistent
+        num_tls = max(len(self.traffic_lights), 1)
+        
+        # Normalized penalties (per traffic light)
+        avg_waiting = total_waiting_time / num_tls
+        avg_queue = total_queue_length / num_tls
+        avg_stops = total_stops / num_tls
+        
+        # Throughput reward (vehicles passed through)
+        throughput_reward = total_vehicles * 0.01
+        
+        # Reward = throughput - penalties (normalized)
+        reward = throughput_reward - (
+            0.01 * avg_waiting +
+            0.01 * avg_queue +
+            0.005 * avg_stops
         )
         
         return reward

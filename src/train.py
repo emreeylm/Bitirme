@@ -34,6 +34,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.environment.sumo_env import SumoEnvironment
+from src.utils.metrics import calculate_metrics
 if torch:
     from src.algorithms.dqn import DQNAgent
     from src.algorithms.maddpg import MADDPG
@@ -91,10 +92,28 @@ def train_dqn(env: SumoEnvironment, config: Dict[str, Any]):
     rewards_history = []
     losses_history = []
     
+    # Metrik geçmişi
+    metrics_history = {
+        "waiting_time": [],
+        "queue_length": [],
+        "stops": [],
+        "delay": [],
+        "throughput": [],
+        "fuel_consumption": [],
+        "co2_emission": [],
+    }
+    
     for episode in range(num_episodes):
         state, info = env.reset()
         episode_reward = 0
         episode_losses = []
+        episode_metrics = {
+            "waiting_time": [],
+            "queue_length": [],
+            "stops": [],
+            "delay": [],
+            "throughput": [],
+        }
         
         for step in range(max_steps):
             # Select action
@@ -121,8 +140,41 @@ def train_dqn(env: SumoEnvironment, config: Dict[str, Any]):
             episode_reward += reward
             state = next_state
             
+            # Metrikleri topla (her 50 adımda bir)
+            if step % 50 == 0:
+                try:
+                    metrics = calculate_metrics(
+                        env.traffic_lights,
+                        include_emissions=True
+                    )
+                    episode_metrics["waiting_time"].append(metrics.get("avg_waiting_time", 0))
+                    episode_metrics["queue_length"].append(metrics.get("avg_queue_length", 0))
+                    episode_metrics["stops"].append(metrics.get("avg_stops", 0))
+                    episode_metrics["delay"].append(metrics.get("avg_delay", 0))
+                    episode_metrics["throughput"].append(metrics.get("throughput", 0))
+                except:
+                    pass
+            
             if done:
                 break
+        
+        # Episode sonu metrikleri
+        try:
+            final_metrics = calculate_metrics(
+                env.traffic_lights,
+                include_emissions=True
+            )
+            metrics_history["waiting_time"].append(np.mean(episode_metrics["waiting_time"]) if episode_metrics["waiting_time"] else 0)
+            metrics_history["queue_length"].append(np.mean(episode_metrics["queue_length"]) if episode_metrics["queue_length"] else 0)
+            metrics_history["stops"].append(np.mean(episode_metrics["stops"]) if episode_metrics["stops"] else 0)
+            metrics_history["delay"].append(np.mean(episode_metrics["delay"]) if episode_metrics["delay"] else 0)
+            metrics_history["throughput"].append(np.mean(episode_metrics["throughput"]) if episode_metrics["throughput"] else 0)
+            metrics_history["fuel_consumption"].append(final_metrics.get("total_fuel_consumption", 0))
+            metrics_history["co2_emission"].append(final_metrics.get("total_co2_emission", 0))
+        except:
+            # Metrik hesaplama başarısız olursa sıfır ekle
+            for key in metrics_history:
+                metrics_history[key].append(0)
         
         # Update epsilon
         agent.update_epsilon()
@@ -133,11 +185,21 @@ def train_dqn(env: SumoEnvironment, config: Dict[str, Any]):
         losses_history.append(avg_loss)
         
         if (episode + 1) % 10 == 0:
+            avg_waiting = metrics_history["waiting_time"][-1] if metrics_history["waiting_time"] else 0
+            avg_queue = metrics_history["queue_length"][-1] if metrics_history["queue_length"] else 0
+            avg_stops = metrics_history["stops"][-1] if metrics_history["stops"] else 0
+            
             print(
                 f"Episode {episode + 1}/{num_episodes} | "
                 f"Reward: {episode_reward:.2f} | "
                 f"Loss: {avg_loss:.4f} | "
                 f"Epsilon: {agent.epsilon:.3f}"
+            )
+            print(
+                f"  📊 Metrikler: "
+                f"Bekleme={avg_waiting:.2f}s | "
+                f"Kuyruk={avg_queue:.2f} | "
+                f"Duruş={avg_stops:.3f}"
             )
         
         # Save checkpoint
@@ -150,7 +212,32 @@ def train_dqn(env: SumoEnvironment, config: Dict[str, Any]):
             agent.save(checkpoint_path)
     
     env.close()
-    return agent, rewards_history, losses_history
+    
+    # Final özet
+    print("\n" + "=" * 70)
+    print("📊 Eğitim Tamamlandı - Final Metrikler")
+    print("=" * 70)
+    
+    if metrics_history["waiting_time"]:
+        print(f"\n⏱️  Ortalama Bekleme Süresi: {np.mean(metrics_history['waiting_time']):.2f} ± {np.std(metrics_history['waiting_time']):.2f} saniye")
+        print(f"📏 Ortalama Kuyruk Uzunluğu: {np.mean(metrics_history['queue_length']):.2f} ± {np.std(metrics_history['queue_length']):.2f}")
+        print(f"🛑 Ortalama Duruş Sayısı: {np.mean(metrics_history['stops']):.3f} ± {np.std(metrics_history['stops']):.3f}")
+        print(f"⏳ Ortalama Gecikme: {np.mean(metrics_history['delay']):.2f} ± {np.std(metrics_history['delay']):.2f} saniye")
+        print(f"🚗 Ortalama Akış (Throughput): {np.mean(metrics_history['throughput']):.2f} ± {np.std(metrics_history['throughput']):.2f} araç")
+        
+        if metrics_history["fuel_consumption"][-1] > 0:
+            print(f"⛽ Toplam Yakıt Tüketimi: {metrics_history['fuel_consumption'][-1]:.2f} ml")
+            print(f"🌍 Toplam CO2 Emisyonu: {metrics_history['co2_emission'][-1]:.2f} g")
+        
+        print(f"\n📈 En İyi Episode:")
+        best_idx = np.argmax(rewards_history)
+        print(f"   Episode {best_idx + 1}: Reward={rewards_history[best_idx]:.2f}")
+        print(f"   Bekleme: {metrics_history['waiting_time'][best_idx]:.2f}s")
+        print(f"   Kuyruk: {metrics_history['queue_length'][best_idx]:.2f}")
+    
+    print("=" * 70)
+    
+    return agent, rewards_history, losses_history, metrics_history
 
 
 def train_maddpg(env: SumoEnvironment, config: Dict[str, Any]):
@@ -222,7 +309,24 @@ def main():
         if DQNAgent is None:
             print("❌ PyTorch yüklü değil. DQN eğitimi yapılamaz.")
             sys.exit(1)
-        agent, rewards, losses = train_dqn(env, config)
+        agent, rewards, losses, metrics = train_dqn(env, config)
+        
+        # Metrikleri kaydet
+        import json
+        results_dir = config.get("log_dir", "experiments/logs")
+        os.makedirs(results_dir, exist_ok=True)
+        
+        results = {
+            "rewards": [float(r) for r in rewards],
+            "losses": [float(l) for l in losses],
+            "metrics": {k: [float(v) for v in vals] for k, vals in metrics.items()}
+        }
+        
+        results_file = os.path.join(results_dir, "training_results.json")
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        print(f"\n✅ Sonuçlar kaydedildi: {results_file}")
     elif args.algorithm == "maddpg":
         if MADDPG is None:
             print("❌ PyTorch yüklü değil. MADDPG eğitimi yapılamaz.")

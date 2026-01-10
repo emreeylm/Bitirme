@@ -1,0 +1,44 @@
+# Bursa Haritası - İyileştirilmiş Konfigürasyon
+
+# SUMO Configuration
+sumo_cfg: "data/scenarios/bursa/bursa.sumocfg"
+net_file: "data/scenarios/bursa/new_clean.net.xml"
+route_file: "data/scenarios/bursa/traffic_low_new.rou.xml"
+
+# Environment Settings
+use_gui: false
+num_seconds: 1000
+yellow_time: 3
+min_green_time: 10
+max_green_time: 60
+delta_time: 5
+
+# Training Settings
+algorithm: "dqn"
+num_episodes: 2000      # Artırıldı: 500 → 2000
+max_steps: 1000
+device: "cpu"
+
+# DQN Hyperparameters - İyileştirilmiş
+lr: 0.0005              # Düşürüldü: 0.001 → 0.0005
+gamma: 0.99
+epsilon_start: 1.0
+epsilon_end: 0.01
+epsilon_decay: 0.999    # Yavaşlatıldı: 0.995 → 0.999
+batch_size: 128         # Artırıldı: 64 → 128
+buffer_size: 50000      # Artırıldı: 10000 → 50000
+target_update_freq: 200 # Artırıldı: 100 → 200
+
+# Logging and Checkpoints
+checkpoint_dir: "experiments/checkpoints/bursa_improved"
+log_dir: "experiments/logs/bursa_improved"
+save_freq: 100
+eval_freq: 50
+
+# Multi-Agent Settings
+multi_agent: true
+num_agents: 12
+
+# Evaluation
+eval_episodes: 5
+eval_use_gui: false
