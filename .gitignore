@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# SUMO
+*.net.xml
+*.rou.xml
+*.sumocfg
+*.log
+*.err
+*.tripinfo.xml
+*.fcd.xml
+*.emission.xml
+
+# Experiments and Logs
+experiments/
+logs/
+*.pkl
+*.h5
+*.hdf5
+checkpoints/
+models/
+*.pt
+*.pth
+
+# Data (large files)
+data/raw/
+data/processed/
+*.osm
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Environment variables
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
